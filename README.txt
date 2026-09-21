@@ -32,3 +32,10 @@ VIKTIG OM E-POST
 - Avsenderadressen må være godkjent/verifisert hos Resend for normal utsending.
 - Med Resends onboarding-adresse kan sending være begrenset til testmottakere.
 - Denne versjonen sender fakturaen som en pen HTML-e-post. PDF ligger fortsatt under Skriv ut / PDF i programmet.
+
+
+E-postlogo:
+- logo.png ligger i roten av repoet.
+- Edge Function send-agkfaktura bruker:
+  https://annegretheark.github.io/agk-faktura/logo.png
+- Etter git push må GitHub Pages ha publisert logo.png før e-postlogoen vises.
