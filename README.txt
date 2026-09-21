@@ -39,3 +39,11 @@ E-postlogo:
 - Edge Function send-agkfaktura bruker:
   https://annegretheark.github.io/agk-faktura/logo.png
 - Etter git push må GitHub Pages ha publisert logo.png før e-postlogoen vises.
+
+
+v8:
+- Eget Glemt passord-knapp på innloggingssiden.
+- Sender recovery med redirect til GitHub Pages.
+- Fanger Supabase PASSWORD_RECOVERY.
+- Viser skjema for nytt passord.
+- Oppdaterer passord via supabase.auth.updateUser().

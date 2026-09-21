@@ -49,8 +49,23 @@ table{width:100%;border-collapse:collapse} th,td{padding:9px 6px;border-bottom:1
     <h2>Logg inn i AGK Faktura</h2>
     <label>E-post</label><input id="loginEmail" type="email" autocomplete="username">
     <label>Passord</label><input id="loginPassword" type="password" autocomplete="current-password">
-    <button class="primary" style="width:100%;margin-top:16px" onclick="login()">Logg inn</button>
+    <button class="primary" style="width:100%;margin-top:16px" onclick="login()">Logg inn</button><button class="secondary" style="width:100%;margin-top:10px" onclick="sendPasswordReset()">Glemt passord?</button>
     <div id="loginMsg"></div>
+  </div>
+</section>
+
+
+<section id="resetView" class="login-wrap hidden">
+  <div class="login-card">
+    <img class="login-logo" src="logo.png" alt="AGKSERVICES KNUTSEN">
+    <h2>Sett nytt passord</h2>
+    <p style="color:#64748b">Skriv inn et nytt passord for AGK Faktura.</p>
+    <label>Nytt passord</label>
+    <input id="newPassword" type="password" autocomplete="new-password">
+    <label>Gjenta nytt passord</label>
+    <input id="newPassword2" type="password" autocomplete="new-password">
+    <button class="primary" style="width:100%;margin-top:16px" onclick="setNewPassword()">Lagre nytt passord</button>
+    <div id="resetMsg"></div>
   </div>
 </section>
 
@@ -151,6 +166,17 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&l
 function statusLabel(s){return ({draft:'Utkast',sent:'Sendt',paid:'Betalt',overdue:'Forfalt'})[s]||s}
 function setMsg(id,msg,ok=false){$(id).className=ok?'ok':'error';$(id).textContent=msg||''}
 
+
+async function sendPasswordReset(){
+  setMsg('loginMsg','');
+  const email=$('loginEmail').value.trim();
+  if(!email) return setMsg('loginMsg','Skriv inn e-postadressen først.');
+  const redirectTo='https://annegretheark.github.io/agk-faktura/';
+  const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo});
+  if(error) return setMsg('loginMsg','Kunne ikke sende reset-lenke: '+error.message);
+  setMsg('loginMsg','Reset-lenke er sendt. Sjekk e-posten din.',true);
+}
+
 async function login(){
   setMsg('loginMsg','');
   const email=$('loginEmail').value.trim(), password=$('loginPassword').value;
@@ -159,6 +185,24 @@ async function login(){
   currentUser=data.user; await startApp();
 }
 async function logout(){await sb.auth.signOut();location.reload()}
+
+async function setNewPassword(){
+  setMsg('resetMsg','');
+  const p1=$('newPassword').value;
+  const p2=$('newPassword2').value;
+  if(!p1 || p1.length < 8) return setMsg('resetMsg','Passordet må være minst 8 tegn.');
+  if(p1 !== p2) return setMsg('resetMsg','Passordene er ikke like.');
+  const {data,error}=await sb.auth.updateUser({password:p1});
+  if(error) return setMsg('resetMsg','Kunne ikke oppdatere passord: '+error.message);
+  setMsg('resetMsg','Passordet er oppdatert. Du kan nå logge inn.',true);
+  setTimeout(async()=>{
+    await sb.auth.signOut();
+    $('resetView').classList.add('hidden');
+    $('loginView').classList.remove('hidden');
+    history.replaceState({}, document.title, window.location.pathname);
+  },1200);
+}
+
 
 async function startApp(){
   $('loginView').classList.add('hidden');$('appView').classList.remove('hidden');
@@ -315,6 +359,38 @@ function showSection(s){['new','invoices','customers'].forEach(x=>$(x+'Section')
 (async()=>{
   const {data:{session}}=await sb.auth.getSession();
   if(session?.user){currentUser=session.user;await startApp()}
+})();
+sb.auth.onAuthStateChange(async (event, session) => {
+  if(event === 'PASSWORD_RECOVERY'){
+    currentUser=session?.user||null;
+    $('loginView').classList.add('hidden');
+    $('appView').classList.add('hidden');
+    $('resetView').classList.remove('hidden');
+    return;
+  }
+  if(event === 'SIGNED_IN' && session?.user && !$('resetView').classList.contains('hidden')){
+    return;
+  }
+});
+
+(async()=>{
+  const hash = window.location.hash || '';
+  const isRecoveryLink = hash.includes('type=recovery');
+
+  const {data:{session}}=await sb.auth.getSession();
+
+  if(isRecoveryLink && session?.user){
+    currentUser=session.user;
+    $('loginView').classList.add('hidden');
+    $('appView').classList.add('hidden');
+    $('resetView').classList.remove('hidden');
+    return;
+  }
+
+  if(session?.user){
+    currentUser=session.user;
+    await startApp();
+  }
 })();
 </script>
 </body>
