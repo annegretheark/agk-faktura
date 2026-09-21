@@ -60,3 +60,12 @@ v10:
 - Retter Supabase Project URL til:
   https://gokzsexvzvmuigqtmcdn.supabase.co
 - Beholder password recovery-fiksen fra v9.
+
+
+v11:
+- Ny profesjonell e-postlayout for faktura.
+- Mindre logo.
+- Fjerner dobbelt firmanavn.
+- Fakturanummer vises som 2026-001 med fallback fra år/løpenummer.
+- Hvit fakturaflate som fungerer bedre i dark mode.
+- Ryddigere kunde-, dato-, betalings- og totalsoner.
