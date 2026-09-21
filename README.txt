@@ -1,21 +1,34 @@
-AGK Faktura v5
+AGK Faktura v6
 
-Nyheter:
-- Supabase Authentication
-- Kunderegister lagres i Supabase
-- Fakturaer lagres i Supabase
-- Fakturalinjer lagres i Supabase
-- Status: Utkast, Sendt, Betalt, Forfalt
-- Automatisk fakturanummer via databasefunksjon
-- Hestelogo innebygd i HTML
+Nytt:
+- Automatisk kundenummer: 1, 2, 3 ...
+- Fakturanummer med årstall: 2026-001, 2026-002 ...
+- Nummereringen starter på 001 på nytt hvert år.
+- Send faktura på e-post via Supabase Edge Function + Resend.
+- E-postknappen oppdaterer status til Sendt etter vellykket sending.
 
-Før bruk:
-1. Åpne Supabase SQL Editor.
-2. Kjør filen supabase-v5.sql én gang.
-3. Åpne index.html.
-4. Logg inn med brukeren du opprettet i Supabase Authentication.
+OPPGRADERING
 
-Sikkerhet:
-- Frontend bruker bare Supabase publishable key.
-- Tilgang til data styres av innlogging + Row Level Security.
-- Ikke legg service_role/secret key i HTML.
+1. Kjør supabase-v6.sql i Supabase SQL Editor.
+
+2. Legg index.html i Git-repoet i stedet for v5-versjonen.
+
+3. Opprett Supabase Edge Function med navnet:
+   send-invoice
+
+   Innholdet ligger i:
+   supabase/functions/send-invoice/index.ts
+
+4. Sett secrets for Edge Function:
+   RESEND_API_KEY = din Resend API key
+   INVOICE_FROM_EMAIL = f.eks. "AGK Faktura <faktura@dittdomene.no>"
+
+   SUPABASE_URL og SUPABASE_ANON_KEY finnes normalt automatisk i Edge Functions.
+
+5. Deploy funksjonen send-invoice.
+
+VIKTIG OM E-POST
+- Resend-nøkkelen skal aldri legges i index.html eller GitHub.
+- Avsenderadressen må være godkjent/verifisert hos Resend for normal utsending.
+- Med Resends onboarding-adresse kan sending være begrenset til testmottakere.
+- Denne versjonen sender fakturaen som en pen HTML-e-post. PDF ligger fortsatt under Skriv ut / PDF i programmet.

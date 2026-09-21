@@ -88,7 +88,7 @@ table{width:100%;border-collapse:collapse} th,td{padding:9px 6px;border-bottom:1
           <div><label>Velg kunde</label><select id="customerSelect" onchange="chooseCustomer()"><option value="">-- Velg kunde --</option></select></div>
         </div>
 
-        <label>Kundenavn / firma</label><input id="custName" oninput="updatePreview()">
+        <div class="row"><div><label>Kundenummer</label><input id="custNumber" readonly></div><div><label>Kundenavn / firma</label><input id="custName" oninput="updatePreview()"></div></div>
         <label>Adresse</label><input id="custAddress" oninput="updatePreview()">
         <div class="row3"><div><label>Postnr.</label><input id="custZip" oninput="updatePreview()"></div><div><label>Sted</label><input id="custCity" oninput="updatePreview()"></div><div><label>Org.nr.</label><input id="custOrg" oninput="updatePreview()"></div></div>
         <div class="row"><div><label>E-post</label><input id="custEmail" type="email"></div><div><label>Telefon</label><input id="custPhone"></div></div>
@@ -100,7 +100,7 @@ table{width:100%;border-collapse:collapse} th,td{padding:9px 6px;border-bottom:1
         <label>Kommentar</label><textarea id="comment" oninput="updatePreview()">Takk for oppdraget!</textarea>
         <div class="totals"><div><span>Sum eks. mva.</span><strong id="sumNet">0,00</strong></div><div><span>MVA</span><strong id="sumVat">0,00</strong></div><div class="grand"><span>Å betale</span><span id="sumGross">0,00</span></div></div>
 
-        <div class="btns"><button class="primary" onclick="saveInvoice()">Lagre faktura</button><button class="secondary" onclick="window.print()">Skriv ut / PDF</button><button class="muted" onclick="newInvoice()">Ny faktura</button></div>
+        <div class="btns"><button class="primary" onclick="saveInvoice()">Lagre faktura</button><button class="secondary" onclick="sendInvoiceEmail()">Send e-post</button><button class="secondary" onclick="window.print()">Skriv ut / PDF</button><button class="muted" onclick="newInvoice()">Ny faktura</button></div>
         <div id="saveMsg"></div>
       </div>
 
@@ -124,7 +124,7 @@ table{width:100%;border-collapse:collapse} th,td{padding:9px 6px;border-bottom:1
     <div class="customer-grid">
       <div class="card"><h2>Kunderegister</h2><input id="customerSearch" placeholder="Søk kunde..." oninput="renderCustomers()"><div id="customerList" style="margin-top:12px"></div></div>
       <div class="card"><h2 id="customerFormTitle">Ny kunde</h2><input id="customerId" type="hidden">
-        <label>Navn / firma</label><input id="cName"><label>Adresse</label><input id="cAddress">
+        <div class="row"><div><label>Kundenummer</label><input id="cNumber" readonly placeholder="Tildeles automatisk"></div><div><label>Navn / firma</label><input id="cName"></div></div><label>Adresse</label><input id="cAddress">
         <div class="row3"><div><label>Postnr.</label><input id="cZip"></div><div><label>Sted</label><input id="cCity"></div><div><label>Org.nr.</label><input id="cOrg"></div></div>
         <div class="row"><div><label>E-post</label><input id="cEmail" type="email"></div><div><label>Telefon</label><input id="cPhone"></div></div>
         <div class="btns"><button class="primary" onclick="saveCustomer()">Lagre kunde</button><button class="muted" onclick="clearCustomerForm()">Ny kunde</button><button id="deleteCustomerBtn" class="danger hidden" onclick="deleteCurrentCustomer()">Slett kunde</button></div>
@@ -184,7 +184,7 @@ function refreshCustomerSelect(){
 }
 function chooseCustomer(){
   const c=customers.find(x=>x.id===$('customerSelect').value); if(!c)return;
-  $('custName').value=c.name||'';$('custAddress').value=c.address||'';$('custZip').value=c.zip||'';$('custCity').value=c.city||'';$('custOrg').value=c.org_number||'';$('custEmail').value=c.email||'';$('custPhone').value=c.phone||'';updatePreview();
+  $('custNumber').value=c.customer_number||'';$('custName').value=c.name||'';$('custAddress').value=c.address||'';$('custZip').value=c.zip||'';$('custCity').value=c.city||'';$('custOrg').value=c.org_number||'';$('custEmail').value=c.email||'';$('custPhone').value=c.phone||'';updatePreview();
 }
 
 function addLine(data={description:'',quantity:1,unit_price:0,vat_rate:25}){
@@ -217,7 +217,7 @@ async function nextInvoiceNumber(){
 }
 async function newInvoice(){
   editingInvoiceId=null;$('invoiceNo').value=await nextInvoiceNumber();$('invoiceDate').value=today();$('dueDate').value=addDays(today(),14);$('status').value='draft';$('customerSelect').value='';
-  ['custName','custAddress','custZip','custCity','custOrg','custEmail','custPhone'].forEach(id=>$(id).value='');
+  ['custNumber','custName','custAddress','custZip','custCity','custOrg','custEmail','custPhone'].forEach(id=>$(id).value='');
   $('comment').value='Takk for oppdraget!';$('linesBody').innerHTML='';addLine();setMsg('saveMsg','');updatePreview();
 }
 
@@ -226,12 +226,12 @@ async function saveInvoice(){
   if(!$('custName').value.trim()) return setMsg('saveMsg','Skriv inn eller velg kunde.');
   let customerId=$('customerSelect').value||null;
   if(!customerId){
-    const payload={user_id:currentUser.id,name:$('custName').value.trim(),address:$('custAddress').value,zip:$('custZip').value,city:$('custCity').value,org_number:$('custOrg').value,email:$('custEmail').value,phone:$('custPhone').value};
+    const {data:nextCust,error:numErr}=await sb.rpc('next_customer_number'); if(numErr)return setMsg('saveMsg','Kundenummer kunne ikke opprettes: '+numErr.message); const payload={user_id:currentUser.id,customer_number:Number(nextCust),name:$('custName').value.trim(),address:$('custAddress').value,zip:$('custZip').value,city:$('custCity').value,org_number:$('custOrg').value,email:$('custEmail').value,phone:$('custPhone').value};
     const {data,error}=await sb.from('customers').insert(payload).select().single();
     if(error)return setMsg('saveMsg','Kunden kunne ikke lagres: '+error.message);
     customerId=data.id; await loadCustomers(); $('customerSelect').value=customerId;
   }
-  const inv={user_id:currentUser.id,invoice_number:Number($('invoiceNo').value),invoice_date:$('invoiceDate').value,due_date:$('dueDate').value||null,customer_id:customerId,status:$('status').value,comment:$('comment').value};
+  const inv={user_id:currentUser.id,invoice_number:Number($('invoiceNo').dataset.seq||0),invoice_year:Number($('invoiceNo').dataset.year||new Date().getFullYear()),invoice_seq:Number($('invoiceNo').dataset.seq||0),invoice_number_text:$('invoiceNo').value,invoice_date:$('invoiceDate').value,due_date:$('dueDate').value||null,customer_id:customerId,status:$('status').value,comment:$('comment').value};
   let invoiceId=editingInvoiceId;
   if(invoiceId){
     const {error}=await sb.from('invoices').update(inv).eq('id',invoiceId); if(error)return setMsg('saveMsg','Fakturaen kunne ikke oppdateres: '+error.message);
@@ -249,25 +249,25 @@ async function saveInvoice(){
 
 function renderInvoices(){
   const q=($('invoiceSearch')?.value||'').toLowerCase(),filter=$('statusFilter')?.value||'';
-  const arr=invoices.filter(x=>(!q||String(x.invoice_number).includes(q)||String(x.customers?.name||'').toLowerCase().includes(q))&&(!filter||x.status===filter));
-  $('invoiceList').innerHTML=arr.length?arr.map(inv=>`<div class="item"><div><strong>${esc(inv.invoice_number)}</strong> – ${esc(inv.customers?.name||'')} <span class="badge badge-${esc(inv.status)}">${esc(statusLabel(inv.status))}</span><br><small>${fmtDate(inv.invoice_date)} · ${money(calc(inv.invoice_lines||[]).gross)} kr</small></div><div class="btns" style="margin:0"><button class="secondary" onclick="openInvoice('${inv.id}')">Åpne</button><select onchange="setInvoiceStatus('${inv.id}',this.value)" style="width:115px;padding:8px"><option value="draft" ${inv.status==='draft'?'selected':''}>Utkast</option><option value="sent" ${inv.status==='sent'?'selected':''}>Sendt</option><option value="paid" ${inv.status==='paid'?'selected':''}>Betalt</option><option value="overdue" ${inv.status==='overdue'?'selected':''}>Forfalt</option></select><button class="danger" onclick="deleteInvoice('${inv.id}')">Slett</button></div></div>`).join(''):'<p>Ingen fakturaer.</p>';
+  const arr=invoices.filter(x=>(!q||String(x.invoice_number_text||x.invoice_number).includes(q)||String(x.customers?.name||'').toLowerCase().includes(q))&&(!filter||x.status===filter));
+  $('invoiceList').innerHTML=arr.length?arr.map(inv=>`<div class="item"><div><strong>${esc(inv.invoice_number_text||inv.invoice_number)}</strong> – ${esc(inv.customers?.name||'')} <span class="badge badge-${esc(inv.status)}">${esc(statusLabel(inv.status))}</span><br><small>${fmtDate(inv.invoice_date)} · ${money(calc(inv.invoice_lines||[]).gross)} kr</small></div><div class="btns" style="margin:0"><button class="secondary" onclick="openInvoice('${inv.id}')">Åpne</button><select onchange="setInvoiceStatus('${inv.id}',this.value)" style="width:115px;padding:8px"><option value="draft" ${inv.status==='draft'?'selected':''}>Utkast</option><option value="sent" ${inv.status==='sent'?'selected':''}>Sendt</option><option value="paid" ${inv.status==='paid'?'selected':''}>Betalt</option><option value="overdue" ${inv.status==='overdue'?'selected':''}>Forfalt</option></select><button class="danger" onclick="deleteInvoice('${inv.id}')">Slett</button></div></div>`).join(''):'<p>Ingen fakturaer.</p>';
 }
 async function setInvoiceStatus(id,status){const {error}=await sb.from('invoices').update({status}).eq('id',id);if(error)return alert(error.message);await loadInvoices()}
 async function deleteInvoice(id){if(!confirm('Slette fakturaen?'))return;const {error}=await sb.from('invoices').delete().eq('id',id);if(error)return alert(error.message);await loadInvoices()}
 function openInvoice(id){
   const inv=invoices.find(x=>x.id===id);if(!inv)return;editingInvoiceId=id;
-  $('invoiceNo').value=inv.invoice_number;$('invoiceDate').value=inv.invoice_date;$('dueDate').value=inv.due_date||'';$('status').value=inv.status;$('customerSelect').value=inv.customer_id||'';
-  const c=customers.find(x=>x.id===inv.customer_id)||{};$('custName').value=c.name||'';$('custAddress').value=c.address||'';$('custZip').value=c.zip||'';$('custCity').value=c.city||'';$('custOrg').value=c.org_number||'';$('custEmail').value=c.email||'';$('custPhone').value=c.phone||'';
+  $('invoiceNo').value=inv.invoice_number_text||`${inv.invoice_year||new Date(inv.invoice_date).getFullYear()}-${String(inv.invoice_seq||inv.invoice_number||0).padStart(3,'0')}`;$('invoiceNo').dataset.year=inv.invoice_year||new Date(inv.invoice_date).getFullYear();$('invoiceNo').dataset.seq=inv.invoice_seq||inv.invoice_number||0;$('invoiceDate').value=inv.invoice_date;$('dueDate').value=inv.due_date||'';$('status').value=inv.status;$('customerSelect').value=inv.customer_id||'';
+  const c=customers.find(x=>x.id===inv.customer_id)||{};$('custNumber').value=c.customer_number||'';$('custName').value=c.name||'';$('custAddress').value=c.address||'';$('custZip').value=c.zip||'';$('custCity').value=c.city||'';$('custOrg').value=c.org_number||'';$('custEmail').value=c.email||'';$('custPhone').value=c.phone||'';
   $('comment').value=inv.comment||'';$('linesBody').innerHTML='';(inv.invoice_lines||[]).forEach(addLine);if(!(inv.invoice_lines||[]).length)addLine();updatePreview();showSection('new');
 }
 
 function renderCustomers(){
   const q=($('customerSearch')?.value||'').toLowerCase();
-  const arr=customers.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.city||'').toLowerCase().includes(q)||(c.org_number||'').toLowerCase().includes(q));
-  $('customerList').innerHTML=arr.length?arr.map(c=>`<div class="customer-row" onclick="editCustomer('${c.id}')"><strong>${esc(c.name)}</strong><br><small>${esc(c.address||'')} ${esc(c.zip||'')} ${esc(c.city||'')}</small></div>`).join(''):'<p>Ingen kunder registrert.</p>';
+  const arr=customers.filter(c=>!q||String(c.customer_number||'').includes(q)||c.name.toLowerCase().includes(q)||(c.city||'').toLowerCase().includes(q)||(c.org_number||'').toLowerCase().includes(q));
+  $('customerList').innerHTML=arr.length?arr.map(c=>`<div class="customer-row" onclick="editCustomer('${c.id}')"><strong>${esc(c.customer_number||'')} · ${esc(c.name)}</strong><br><small>${esc(c.address||'')} ${esc(c.zip||'')} ${esc(c.city||'')}</small></div>`).join(''):'<p>Ingen kunder registrert.</p>';
 }
-function editCustomer(id){const c=customers.find(x=>x.id===id);if(!c)return;$('customerId').value=c.id;$('cName').value=c.name||'';$('cAddress').value=c.address||'';$('cZip').value=c.zip||'';$('cCity').value=c.city||'';$('cOrg').value=c.org_number||'';$('cEmail').value=c.email||'';$('cPhone').value=c.phone||'';$('customerFormTitle').textContent='Rediger kunde';$('deleteCustomerBtn').classList.remove('hidden')}
-function clearCustomerForm(){['customerId','cName','cAddress','cZip','cCity','cOrg','cEmail','cPhone'].forEach(id=>$(id).value='');$('customerFormTitle').textContent='Ny kunde';$('deleteCustomerBtn').classList.add('hidden');setMsg('customerMsg','')}
+function editCustomer(id){const c=customers.find(x=>x.id===id);if(!c)return;$('customerId').value=c.id;$('cNumber').value=c.customer_number||'';$('cName').value=c.name||'';$('cAddress').value=c.address||'';$('cZip').value=c.zip||'';$('cCity').value=c.city||'';$('cOrg').value=c.org_number||'';$('cEmail').value=c.email||'';$('cPhone').value=c.phone||'';$('customerFormTitle').textContent='Rediger kunde';$('deleteCustomerBtn').classList.remove('hidden')}
+function clearCustomerForm(){['customerId','cNumber','cName','cAddress','cZip','cCity','cOrg','cEmail','cPhone'].forEach(id=>$(id).value='');$('customerFormTitle').textContent='Ny kunde';$('deleteCustomerBtn').classList.add('hidden');setMsg('customerMsg','')}
 async function saveCustomer(){
   setMsg('customerMsg','');const id=$('customerId').value;const payload={user_id:currentUser.id,name:$('cName').value.trim(),address:$('cAddress').value,zip:$('cZip').value,city:$('cCity').value,org_number:$('cOrg').value,email:$('cEmail').value,phone:$('cPhone').value};
   if(!payload.name)return setMsg('customerMsg','Kunden må ha et navn.');
@@ -275,6 +275,40 @@ async function saveCustomer(){
   if(res.error)return setMsg('customerMsg',res.error.message);setMsg('customerMsg','Kunde lagret.',true);clearCustomerForm();await loadCustomers();
 }
 async function deleteCurrentCustomer(){const id=$('customerId').value;if(!id||!confirm('Slette denne kunden?'))return;const {error}=await sb.from('customers').delete().eq('id',id);if(error)return setMsg('customerMsg',error.message);clearCustomerForm();await loadCustomers()}
+
+
+async function sendInvoiceEmail(){
+  setMsg('saveMsg','');
+  if(!editingInvoiceId){
+    return setMsg('saveMsg','Lagre fakturaen først før du sender den på e-post.');
+  }
+  const email=$('custEmail').value.trim();
+  if(!email) return setMsg('saveMsg','Kunden mangler e-postadresse.');
+  if(!confirm(`Sende faktura ${$('invoiceNo').value} til ${email}?`)) return;
+
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session) return setMsg('saveMsg','Du må logge inn på nytt.');
+
+  try{
+    const res=await fetch(`${SUPABASE_URL}/functions/v1/send-invoice`,{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':`Bearer ${session.access_token}`,
+        'apikey':SUPABASE_KEY
+      },
+      body:JSON.stringify({invoice_id:editingInvoiceId})
+    });
+    const body=await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(body.error||`HTTP ${res.status}`);
+    setMsg('saveMsg','Faktura sendt på e-post.',true);
+    $('status').value='sent';
+    await sb.from('invoices').update({status:'sent'}).eq('id',editingInvoiceId);
+    await loadInvoices();
+  }catch(e){
+    setMsg('saveMsg','E-post kunne ikke sendes: '+e.message);
+  }
+}
 
 function showSection(s){['new','invoices','customers'].forEach(x=>$(x+'Section').classList.toggle('hidden',x!==s));$('navNew').classList.toggle('active',s==='new');$('navInvoices').classList.toggle('active',s==='invoices');$('navCustomers').classList.toggle('active',s==='customers');if(s==='invoices')renderInvoices();if(s==='customers')renderCustomers()}
 
