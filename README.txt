@@ -47,3 +47,10 @@ v8:
 - Fanger Supabase PASSWORD_RECOVERY.
 - Viser skjema for nytt passord.
 - Oppdaterer passord via supabase.auth.updateUser().
+
+
+v9:
+- Retter recovery-lenker som kommer tilbake med #access_token.
+- Leser access_token, refresh_token og type=recovery direkte fra URL.
+- Kaller supabase.auth.setSession() eksplisitt.
+- Viser deretter Sett nytt passord-skjemaet.

@@ -199,7 +199,7 @@ async function setNewPassword(){
     await sb.auth.signOut();
     $('resetView').classList.add('hidden');
     $('loginView').classList.remove('hidden');
-    history.replaceState({}, document.title, window.location.pathname);
+    history.replaceState({}, document.title, window.location.pathname + window.location.search);
   },1200);
 }
 
@@ -360,35 +360,56 @@ function showSection(s){['new','invoices','customers'].forEach(x=>$(x+'Section')
   const {data:{session}}=await sb.auth.getSession();
   if(session?.user){currentUser=session.user;await startApp()}
 })();
+
+function showResetView(){
+  $('loginView').classList.add('hidden');
+  $('appView').classList.add('hidden');
+  $('resetView').classList.remove('hidden');
+}
+
+async function handleRecoveryFromUrl(){
+  const hash = window.location.hash || '';
+  if(!hash.includes('access_token=')) return false;
+
+  const params = new URLSearchParams(hash.substring(1));
+  const access_token = params.get('access_token');
+  const refresh_token = params.get('refresh_token');
+  const type = params.get('type');
+
+  if(type !== 'recovery' || !access_token || !refresh_token) return false;
+
+  const {data,error} = await sb.auth.setSession({
+    access_token,
+    refresh_token
+  });
+
+  if(error){
+    setMsg('loginMsg','Recovery-lenken kunne ikke åpnes: '+error.message);
+    return false;
+  }
+
+  currentUser = data.session?.user || null;
+  showResetView();
+  return true;
+}
+
 sb.auth.onAuthStateChange(async (event, session) => {
   if(event === 'PASSWORD_RECOVERY'){
-    currentUser=session?.user||null;
-    $('loginView').classList.add('hidden');
-    $('appView').classList.add('hidden');
-    $('resetView').classList.remove('hidden');
-    return;
-  }
-  if(event === 'SIGNED_IN' && session?.user && !$('resetView').classList.contains('hidden')){
+    currentUser = session?.user || null;
+    showResetView();
     return;
   }
 });
 
 (async()=>{
-  const hash = window.location.hash || '';
-  const isRecoveryLink = hash.includes('type=recovery');
+  // Recovery links from Supabase arrive with tokens in the URL hash.
+  // Handle them explicitly before normal session startup.
+  const handledRecovery = await handleRecoveryFromUrl();
+  if(handledRecovery) return;
 
-  const {data:{session}}=await sb.auth.getSession();
-
-  if(isRecoveryLink && session?.user){
-    currentUser=session.user;
-    $('loginView').classList.add('hidden');
-    $('appView').classList.add('hidden');
-    $('resetView').classList.remove('hidden');
-    return;
-  }
-
+  const {data:{session}} = await sb.auth.getSession();
   if(session?.user){
-    currentUser=session.user;
+    currentUser = session.user;
     await startApp();
   }
 })();
