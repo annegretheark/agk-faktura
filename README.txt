@@ -54,3 +54,9 @@ v9:
 - Leser access_token, refresh_token og type=recovery direkte fra URL.
 - Kaller supabase.auth.setSession() eksplisitt.
 - Viser deretter Sett nytt passord-skjemaet.
+
+
+v10:
+- Retter Supabase Project URL til:
+  https://gokzsexvzvmuigqtmcdn.supabase.co
+- Beholder password recovery-fiksen fra v9.
