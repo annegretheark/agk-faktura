@@ -290,7 +290,7 @@ async function sendInvoiceEmail(){
   if(!session) return setMsg('saveMsg','Du må logge inn på nytt.');
 
   try{
-    const res=await fetch(`${SUPABASE_URL}/functions/v1/send-invoice`,{
+    const res=await fetch(`${SUPABASE_URL}/functions/v1/send-agkfaktura`,{
       method:'POST',
       headers:{
         'Content-Type':'application/json',
