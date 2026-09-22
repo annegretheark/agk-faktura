@@ -216,7 +216,7 @@ async function loadCustomers(){
   customers=data||[]; refreshCustomerSelect(); renderCustomers();
 }
 async function loadInvoices(){
-  const {data,error}=await sb.from('invoices').select('*, customers(name), invoice_lines(*)').order('invoice_number',{ascending:false});
+  const {data,error}=await sb.from('invoices').select('*, customers(name), invoice_lines(*)').order('invoice_year',{ascending:false}).order('invoice_seq',{ascending:false});
   if(error){alert('Kunne ikke hente fakturaer: '+error.message);return}
   invoices=data||[]; renderInvoices();
 }
@@ -253,14 +253,44 @@ function updatePreview(){
 }
 
 async function nextInvoiceNumber(){
-  const {data,error}=await sb.rpc('next_invoice_number');
-  if(!error && data!=null) return Number(data);
-  const {data:rows,error:e2}=await sb.from('invoices').select('invoice_number').order('invoice_number',{ascending:false}).limit(1);
-  if(e2) throw e2;
-  return (rows?.[0]?.invoice_number||0)+1;
+  const year=new Date().getFullYear();
+
+  // Hent alle fakturaer for innevaerende bruker/aar og finn hoyeste sekvens.
+  // Dette er ogsa robust mot eldre fakturaer som bare har "1" i invoice_number_text.
+  const {data:rows,error}=await sb
+    .from('invoices')
+    .select('invoice_year,invoice_seq,invoice_number,invoice_number_text')
+    .eq('user_id',currentUser.id);
+
+  if(error) throw error;
+
+  let maxSeq=0;
+  for(const r of (rows||[])){
+    const rowYear=Number(r.invoice_year||year);
+    if(rowYear!==year) continue;
+
+    let seq=Number(r.invoice_seq||0);
+
+    if(!seq && r.invoice_number_text){
+      const txt=String(r.invoice_number_text).trim();
+      const m=txt.match(/^(\d{4})-(\d+)$/);
+      if(m && Number(m[1])===year) seq=Number(m[2]);
+      else if(/^\d+$/.test(txt)) seq=Number(txt);
+    }
+
+    if(!seq && r.invoice_number) seq=Number(r.invoice_number);
+    if(seq>maxSeq) maxSeq=seq;
+  }
+
+  return {year,seq:maxSeq+1};
 }
 async function newInvoice(){
-  editingInvoiceId=null;$('invoiceNo').value=await nextInvoiceNumber();$('invoiceDate').value=today();$('dueDate').value=addDays(today(),14);$('status').value='draft';$('customerSelect').value='';
+  editingInvoiceId=null;
+  const next=await nextInvoiceNumber();
+  $('invoiceNo').dataset.year=next.year;
+  $('invoiceNo').dataset.seq=next.seq;
+  $('invoiceNo').value=`${next.year}-${String(next.seq).padStart(3,'0')}`;
+  $('invoiceDate').value=today();$('dueDate').value=addDays(today(),14);$('status').value='draft';$('customerSelect').value='';
   ['custNumber','custName','custAddress','custZip','custCity','custOrg','custEmail','custPhone'].forEach(id=>$(id).value='');
   $('comment').value='Takk for oppdraget!';$('linesBody').innerHTML='';addLine();setMsg('saveMsg','');updatePreview();
 }
