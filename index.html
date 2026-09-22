@@ -226,9 +226,38 @@ function refreshCustomerSelect(){
   $('customerSelect').innerHTML='<option value="">-- Velg kunde --</option>'+customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
   if(customers.some(c=>c.id===old)) $('customerSelect').value=old;
 }
-function chooseCustomer(){
+async function getNextCustomerNumber(){
+  // Bruk databasefunksjonen hvis den finnes. Hvis ikke, finn neste nummer fra kundene som allerede er lastet.
+  try{
+    const {data,error}=await sb.rpc('next_customer_number');
+    if(!error && data!==null && data!==undefined && Number(data)>0) return Number(data);
+  }catch(e){}
+  let maxNo=0;
+  for(const c of customers){
+    const n=Number(c.customer_number||0);
+    if(Number.isFinite(n) && n>maxNo) maxNo=n;
+  }
+  return maxNo+1;
+}
+
+async function ensureCustomerNumber(c){
+  if(!c) return null;
+  if(c.customer_number) return Number(c.customer_number);
+  const nextNo=await getNextCustomerNumber();
+  const {data,error}=await sb.from('customers').update({customer_number:nextNo}).eq('id',c.id).select().single();
+  if(error){
+    alert('Kundenummer kunne ikke lagres: '+error.message);
+    return null;
+  }
+  c.customer_number=data?.customer_number||nextNo;
+  return Number(c.customer_number);
+}
+
+async function chooseCustomer(){
   const c=customers.find(x=>x.id===$('customerSelect').value); if(!c)return;
-  $('custNumber').value=c.customer_number||'';$('custName').value=c.name||'';$('custAddress').value=c.address||'';$('custZip').value=c.zip||'';$('custCity').value=c.city||'';$('custOrg').value=c.org_number||'';$('custEmail').value=c.email||'';$('custPhone').value=c.phone||'';updatePreview();
+  const customerNo=await ensureCustomerNumber(c);
+  $('custNumber').value=customerNo||'';$('custName').value=c.name||'';$('custAddress').value=c.address||'';$('custZip').value=c.zip||'';$('custCity').value=c.city||'';$('custOrg').value=c.org_number||'';$('custEmail').value=c.email||'';$('custPhone').value=c.phone||'';updatePreview();
+  renderCustomers();
 }
 
 function addLine(data={description:'',quantity:1,unit_price:0,vat_rate:25}){
@@ -328,10 +357,10 @@ function renderInvoices(){
 }
 async function setInvoiceStatus(id,status){const {error}=await sb.from('invoices').update({status}).eq('id',id);if(error)return alert(error.message);await loadInvoices()}
 async function deleteInvoice(id){if(!confirm('Slette fakturaen?'))return;const {error}=await sb.from('invoices').delete().eq('id',id);if(error)return alert(error.message);await loadInvoices()}
-function openInvoice(id){
+async function openInvoice(id){
   const inv=invoices.find(x=>x.id===id);if(!inv)return;editingInvoiceId=id;
   $('invoiceNo').value=inv.invoice_number_text||`${inv.invoice_year||new Date(inv.invoice_date).getFullYear()}-${String(inv.invoice_seq||inv.invoice_number||0).padStart(3,'0')}`;$('invoiceNo').dataset.year=inv.invoice_year||new Date(inv.invoice_date).getFullYear();$('invoiceNo').dataset.seq=inv.invoice_seq||inv.invoice_number||0;$('invoiceDate').value=inv.invoice_date;$('dueDate').value=inv.due_date||'';$('status').value=inv.status;$('customerSelect').value=inv.customer_id||'';
-  const c=customers.find(x=>x.id===inv.customer_id)||{};$('custNumber').value=c.customer_number||'';$('custName').value=c.name||'';$('custAddress').value=c.address||'';$('custZip').value=c.zip||'';$('custCity').value=c.city||'';$('custOrg').value=c.org_number||'';$('custEmail').value=c.email||'';$('custPhone').value=c.phone||'';
+  const c=customers.find(x=>x.id===inv.customer_id)||{};const customerNo=c.id?await ensureCustomerNumber(c):null;$('custNumber').value=customerNo||c.customer_number||'';$('custName').value=c.name||'';$('custAddress').value=c.address||'';$('custZip').value=c.zip||'';$('custCity').value=c.city||'';$('custOrg').value=c.org_number||'';$('custEmail').value=c.email||'';$('custPhone').value=c.phone||'';
   $('comment').value=inv.comment||'';$('linesBody').innerHTML='';(inv.invoice_lines||[]).forEach(addLine);if(!(inv.invoice_lines||[]).length)addLine();updatePreview();showSection('new');
 }
 
@@ -352,9 +381,7 @@ async function saveCustomer(){
   let existingCustomer=id?customers.find(c=>String(c.id)===String(id)):null;
   let customerNumber=existingCustomer?.customer_number||null;
   if(!customerNumber){
-    const {data:nextCust,error:numErr}=await sb.rpc('next_customer_number');
-    if(numErr)return setMsg('customerMsg','Kundenummer kunne ikke opprettes: '+numErr.message);
-    customerNumber=Number(nextCust);
+    customerNumber=await getNextCustomerNumber();
     payload.customer_number=customerNumber;
   }
 
