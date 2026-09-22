@@ -343,10 +343,33 @@ function renderCustomers(){
 function editCustomer(id){const c=customers.find(x=>x.id===id);if(!c)return;$('customerId').value=c.id;$('cNumber').value=c.customer_number||'';$('cName').value=c.name||'';$('cAddress').value=c.address||'';$('cZip').value=c.zip||'';$('cCity').value=c.city||'';$('cOrg').value=c.org_number||'';$('cEmail').value=c.email||'';$('cPhone').value=c.phone||'';$('customerFormTitle').textContent='Rediger kunde';$('deleteCustomerBtn').classList.remove('hidden')}
 function clearCustomerForm(){['customerId','cNumber','cName','cAddress','cZip','cCity','cOrg','cEmail','cPhone'].forEach(id=>$(id).value='');$('customerFormTitle').textContent='Ny kunde';$('deleteCustomerBtn').classList.add('hidden');setMsg('customerMsg','')}
 async function saveCustomer(){
-  setMsg('customerMsg','');const id=$('customerId').value;const payload={user_id:currentUser.id,name:$('cName').value.trim(),address:$('cAddress').value,zip:$('cZip').value,city:$('cCity').value,org_number:$('cOrg').value,email:$('cEmail').value,phone:$('cPhone').value};
+  setMsg('customerMsg','');
+  const id=$('customerId').value;
+  const payload={user_id:currentUser.id,name:$('cName').value.trim(),address:$('cAddress').value,zip:$('cZip').value,city:$('cCity').value,org_number:$('cOrg').value,email:$('cEmail').value,phone:$('cPhone').value};
   if(!payload.name)return setMsg('customerMsg','Kunden må ha et navn.');
-  const res=id?await sb.from('customers').update(payload).eq('id',id):await sb.from('customers').insert(payload);
-  if(res.error)return setMsg('customerMsg',res.error.message);setMsg('customerMsg','Kunde lagret.',true);clearCustomerForm();await loadCustomers();
+
+  // Nye kunder skal alltid få kundenummer. Eksisterende kunder uten nummer får også neste ledige nummer.
+  let existingCustomer=id?customers.find(c=>String(c.id)===String(id)):null;
+  let customerNumber=existingCustomer?.customer_number||null;
+  if(!customerNumber){
+    const {data:nextCust,error:numErr}=await sb.rpc('next_customer_number');
+    if(numErr)return setMsg('customerMsg','Kundenummer kunne ikke opprettes: '+numErr.message);
+    customerNumber=Number(nextCust);
+    payload.customer_number=customerNumber;
+  }
+
+  let res;
+  if(id){
+    res=await sb.from('customers').update(payload).eq('id',id).select().single();
+  }else{
+    res=await sb.from('customers').insert(payload).select().single();
+  }
+  if(res.error)return setMsg('customerMsg',res.error.message);
+
+  $('cNumber').value=customerNumber||res.data?.customer_number||'';
+  setMsg('customerMsg','Kunde lagret med kundenummer '+($('cNumber').value||'')+'.',true);
+  await loadCustomers();
+  if(res.data?.id) editCustomer(res.data.id);
 }
 async function deleteCurrentCustomer(){const id=$('customerId').value;if(!id||!confirm('Slette denne kunden?'))return;const {error}=await sb.from('customers').delete().eq('id',id);if(error)return setMsg('customerMsg',error.message);clearCustomerForm();await loadCustomers()}
 
