@@ -137,8 +137,8 @@ table{width:100%;border-collapse:collapse} th,td{padding:9px 6px;border-bottom:1
   <section id="sentSection" class="hidden"><div class="card">
 <h2>Sendte fakturaer og kreditnotaer</h2>
 <p class="notice">Viser dokumenter med status Sendt, Betalt eller Forfalt. Kreditnotaer gjenkjennes på teksten «KREDITNOTA» i kommentarfeltet. Status er ikke en garanti for at e-post faktisk ble levert.</p>
-<div class="toolbar"><input id="sentSearch" placeholder="Søk på nummer eller kunde" oninput="renderSentTable()"><select id="sentType" style="max-width:220px" onchange="renderSentTable()"><option value="all">Alle dokumenter</option><option value="invoice">Fakturaer</option><option value="credit">Kreditnotaer</option></select><button class="secondary" onclick="loadInvoices()">Oppdater</button></div>
-<div style="overflow-x:auto"><table><thead><tr><th>Type</th><th>Nummer</th><th>Dato</th><th>Kunde</th><th>Status</th><th>Beløp inkl. mva.</th><th>Handling</th></tr></thead><tbody id="sentTableBody"></tbody></table></div>
+<div class="toolbar"><input id="sentSearch" placeholder="Søk på fakturanr., kreditnotanr. eller kunde" oninput="renderSentTable()"><select id="sentType" style="max-width:220px" onchange="renderSentTable()"><option value="all">Alle dokumenter</option><option value="invoice">Fakturaer</option><option value="credit">Kreditnotaer</option></select><button class="secondary" onclick="loadInvoices()">Oppdater</button></div>
+<div style="overflow-x:auto"><table><thead><tr><th>Type</th><th>Fakturanr.</th><th>Kreditnotanr.</th><th>Dato</th><th>Kunde</th><th>Status</th><th>Beløp inkl. mva.</th><th>Handling</th></tr></thead><tbody id="sentTableBody"></tbody></table></div>
 <p id="sentSummary" style="font-weight:700;margin-top:16px"></p>
 </div></section>
 <section id="invoicesSection" class="hidden"><div class="card"><h2>Fakturaer</h2><div class="toolbar"><input id="invoiceSearch" placeholder="Søk på fakturanr. eller kunde..." oninput="renderInvoices()"><select id="statusFilter" style="max-width:180px" onchange="renderInvoices()"><option value="">Alle statuser</option><option value="draft">Utkast</option><option value="sent">Sendt</option><option value="paid">Betalt</option><option value="overdue">Forfalt</option></select></div><div id="invoiceList" class="list"></div></div></section>
@@ -367,15 +367,18 @@ function renderSentTable(){
  const rows=invoices.filter(inv=>{
   const credit=String(inv.comment||'').trim().toUpperCase().startsWith('KREDITNOTA');
   const number=String(inv.invoice_number_text||inv.invoice_number||'');
+  const originalNumber=credit?(String(inv.comment||'').match(/gjelder faktura\s+([^\s,;]+)/i)?.[1]||''):'';
   const customer=String(inv.customers?.name||'');
   return ['sent','paid','overdue'].includes(inv.status)&&
     (type==='all'||(type==='credit')===credit)&&
-    (!q||number.toLowerCase().includes(q)||customer.toLowerCase().includes(q));
+    (!q||number.toLowerCase().includes(q)||originalNumber.toLowerCase().includes(q)||customer.toLowerCase().includes(q));
  });
  $('sentTableBody').innerHTML=rows.length?rows.map(inv=>{
   const credit=String(inv.comment||'').trim().toUpperCase().startsWith('KREDITNOTA');
-  return `<tr><td>${credit?'Kreditnota':'Faktura'}</td><td>${esc(inv.invoice_number_text||inv.invoice_number)}</td><td>${esc(fmtDate(inv.invoice_date))}</td><td>${esc(inv.customers?.name||'')}</td><td>${esc(statusLabel(inv.status))}</td><td style="white-space:nowrap">${money(calc(inv.invoice_lines||[]).gross)} kr</td><td><button class="secondary" onclick="openInvoice('${inv.id}')">Åpne</button></td></tr>`;
- }).join(''):'<tr><td colspan="7">Ingen dokumenter med valgt filter.</td></tr>';
+  const originalNumber=credit?(String(inv.comment||'').match(/gjelder faktura\s+([^\s,;]+)/i)?.[1]||''):(inv.invoice_number_text||inv.invoice_number||'');
+  const creditNumber=credit?(inv.invoice_number_text||inv.invoice_number||''):'';
+  return `<tr><td>${credit?'Kreditnota':'Faktura'}</td><td>${esc(originalNumber||'–')}</td><td>${esc(creditNumber||'–')}</td><td>${esc(fmtDate(inv.invoice_date))}</td><td>${esc(inv.customers?.name||'')}</td><td>${esc(statusLabel(inv.status))}</td><td style="white-space:nowrap">${money(calc(inv.invoice_lines||[]).gross)} kr</td><td><button class="secondary" onclick="openInvoice('${inv.id}')">Åpne</button></td></tr>`;
+ }).join(''):'<tr><td colspan="8">Ingen dokumenter med valgt filter.</td></tr>';
  $('sentSummary').textContent=`${rows.length} dokument(er) · Sum inkl. mva.: ${money(rows.reduce((sum,inv)=>sum+calc(inv.invoice_lines||[]).gross,0))} kr`;
 }
 function renderInvoices(){
